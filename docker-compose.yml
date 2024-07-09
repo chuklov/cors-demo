@@ -1,4 +1,11 @@
 services:
+  demo-ui:
+    container_name: demo-ui
+    image: demo-ui
+    build:
+      context: ./demo-ui/
+    ports:
+      - "3000:80"
 
   postgres:
     container_name: demo-postgres
