@@ -1,13 +1,16 @@
-package com.cors.demo;
+package com.cors.demo.security;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.core.*;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
@@ -18,10 +21,19 @@ import java.util.Arrays;
 
 
 @Configuration
-@EnableWebSecurity
-@EnableMethodSecurity
+@EnableWebFluxSecurity
+@EnableReactiveMethodSecurity(useAuthorizationManager=true)
 public class SecurityConfig {
     private static final Logger LOGGER = LogManager.getLogger(SecurityConfig.class);
+
+    private final JwtAuthConverter jwtAuthConverter;
+    private final Environment env;
+
+    public SecurityConfig(JwtAuthConverter jwtAuthConverter, Environment env) {
+        this.jwtAuthConverter = jwtAuthConverter;
+        this.env = env;
+    }
+
 
     @Bean
     SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
@@ -29,8 +41,13 @@ public class SecurityConfig {
         http
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .pathMatchers("/info/**").permitAll()
                         .anyExchange().authenticated()
                 )
+                .oauth2ResourceServer(oAuth -> oAuth.jwt(jwt -> {
+                    jwt.jwtDecoder(jwtDecoder());
+                    jwt.jwtAuthenticationConverter(jwtAuthConverter);
+                }))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(corsSpec -> corsSpec.configurationSource(corsConfigurationSource()));
 
@@ -51,6 +68,18 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
 
         return source;
+    }
+
+    /**
+     * This decoder is part of a new Spring security token validation
+     * @return validated token
+     */
+    @Bean
+    public ReactiveJwtDecoder jwtDecoder() {
+        String keycloakUrl = env.getProperty("spring.security.oauth2.resourceserver.jwt.issuer-uri");
+        NimbusReactiveJwtDecoder jwtDecoder = (NimbusReactiveJwtDecoder) ReactiveJwtDecoders.fromIssuerLocation(keycloakUrl);
+        jwtDecoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(keycloakUrl), new DemoJwtValidator()));
+        return jwtDecoder;
     }
 }
 

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/info")
 public class DemoController {
 
     private static final Logger LOGGER = LogManager.getLogger(DemoController.class);

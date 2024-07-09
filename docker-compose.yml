@@ -1,0 +1,72 @@
+services:
+
+  postgres:
+    container_name: demo-postgres
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: abcd
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./addition/liquibase/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - demo-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    container_name: demo-keycloak
+    environment:
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+      KC_DB_VENDOR: POSTGRES
+      KC_DB_ADDR: postgres
+      KC_DB_DATABASE: service_keycloak
+      KC_DB_PORT: 5432
+      KC_DB_USER: keycloak
+      KC_DB_PASSWORD: password
+      KEYCLOAK_ADMIN: demo
+      KEYCLOAK_ADMIN_PASSWORD: password
+      KEYCLOAK_IMPORT: /opt/keycloak/data/import/realm-export.json
+      KC_FEATURES: account-api,account2,account3
+#      KC_LOG_LEVEL: DEBUG
+      # Uncomment the line below if you want to specify JDBC parameters. The parameter below is just an example, and it shouldn't be used in production without knowledge. It is highly recommended that you read the MySQL JDBC driver documentation in order to use it.
+#      JDBC_PARAMS: "connectTimeout=30000"
+#      DB_JDBC_PARAMS: useSSL=false&allowPublicKeyRetrieval=true
+    volumes:
+        - ./addition/keycloak:/opt/keycloak/data/import
+    command:
+      - "start-dev"
+      - "-Dkeycloak.migration.action=import"
+      - "-Dkeycloak.migration.provider=singleFile"
+      - "-Dkeycloak.migration.strategy=OVERWRITE_EXISTING"
+      - "-Dkeycloak.migration.file=/opt/keycloak/data/import/realm-export.json"
+    ports:
+      - "8080:8080"
+    networks:
+      - demo-network
+    depends_on:
+      - postgres
+
+#  demo-app:
+#    platform: linux/arm64/v8
+#    image: demo-app:latest
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: demo-app
+#    volumes:
+#      - ./addition/config:/app/config
+#    ports:
+#      - "8081:8081"
+#    networks:
+#      - demo-network
+#    depends_on:
+#      - keycloak
+
+networks:
+  demo-network:
+    driver: bridge
+
